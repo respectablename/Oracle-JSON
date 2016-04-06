@@ -1,5 +1,5 @@
-CREATE OR REPLACE PACKAGE BODY SHPK_JSON as
-    FUNCTION SHF_GET_JSON(p_first NUMBER DEFAULT 1, p_table VARCHAR2, p_where VARCHAR2 DEfAULT NULL) RETURN CLOB
+CREATE OR REPLACE PACKAGE BODY PKG_JSON as
+    FUNCTION GET_JSON(p_first NUMBER DEFAULT 1, p_table VARCHAR2, p_where VARCHAR2 DEfAULT NULL) RETURN CLOB
     IS result CLOB;
       v_v_val     VARCHAR2(4000);
       v_n_val     NUMBER;
@@ -96,14 +96,14 @@ CREATE OR REPLACE PACKAGE BODY SHPK_JSON as
           
             result := result || chr(11) || '"' || foreignTable || '":[';
             DBMS_SQL.COLUMN_VALUE(c,j,v_n_val);
-            result := result || SHPK_JSON.SHF_GET_JSON(0, foreignTable, rec_tab(j).col_name || ' = ' || v_n_val);
+            result := result || GET_JSON(0, foreignTable, rec_tab(j).col_name || ' = ' || v_n_val);
             result := result || chr(11) || ']';
           ELSE
               -- Fetch each column into the correct data type based on the description of the column
               CASE rec_tab(j).col_type
                 WHEN 1  THEN DBMS_SQL.COLUMN_VALUE(c,j,v_v_val);
                     if INSTR(v_v_val, chr(10)) > 0 OR INSTR(v_v_val, chr(13)) > 0 THEN
-                        result := result || chr(11) || '"' || rec_tab(j).col_name || '":' || TO_CHAR(SHPK_JSON.SHF_STRING_ARRAY(v_v_val)) || '';
+                        result := result || chr(11) || '"' || rec_tab(j).col_name || '":' || TO_CHAR(BUILD_STRING_ARRAY(v_v_val)) || '';
                     ELSE
                         result := result || chr(11) || '"' || rec_tab(j).col_name || '":"' || v_v_val || '"';
                     END IF;
@@ -136,13 +136,13 @@ CREATE OR REPLACE PACKAGE BODY SHPK_JSON as
       return result;
     END;
 
-    FUNCTION SHF_STRING_ARRAY(p_line VARCHAR2) RETURN CLOB
+    FUNCTION BUILD_STRING_ARRAY(p_line VARCHAR2) RETURN CLOB
     IS result CLOB;
     BEGIN
         result := '["' || REPLACE(REPLACE(REPLACE(p_line, chr(13), chr(10)), chr(10) || chr(10), chr(10)), chr(10) , '", "' ) || '"]';           
         return result;
     END;  
-END SHPK_JSON;
+END PKG_JSON;
 
 -- the following code examples contributed to this project
 -- https://community.oracle.com/thread/1004502?tstart=0
