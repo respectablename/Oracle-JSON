@@ -2,10 +2,12 @@ My goal was to make a function which produced JSON from a given table and would 
 
 The output can seen from this example:
 
+<pre>
 SET SERVEROUTPUT ON
 BEGIN
   DBMS_OUTPUT.PUT_LINE(PKG_JSON.GET_JSON(1, 'COMMENT'));
 END;
+</pre>
 
 <pre>
 {
