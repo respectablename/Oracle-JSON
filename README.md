@@ -4,10 +4,44 @@ The output can seen from this example:
 
 SET SERVEROUTPUT ON
 BEGIN
-  DBMS_OUTPUT.PUT_LINE(SHPK_JSON.SHF_GET_JSON(1, 'COMMENT'));
+  DBMS_OUTPUT.PUT_LINE(PKG_JSON.GET_JSON(1, 'COMMENT'));
 END;
 
-{"COMMENT":[{"REPORT_TYPE":[{"REPORT_TYPE_CK":"21","REPORT_NAME":"Debit Transaction"}],"RECORD_CK":"285","COMMENT_CK":"23","CONTENT":"This is a test comment for Debit Transaction record.","CREATE_DATE":"22/02/2016 13:54:27","CREATED_BY":"user1"},{"REPORT_TYPE":[{"REPORT_TYPE_CK":"21","REPORT_NAME":"Debit Transaction"}],"RECORD_CK":"285","COMMENT_CK":"41","CONTENT":"Test Comment #2","CREATE_DATE":"23/02/2016 14:12:02","CREATED_BY":"user1"},{"REPORT_TYPE":[{"REPORT_TYPE_CK":"21","REPORT_NAME":"Debit Transaction"}],"RECORD_CK":"285","COMMENT_CK":"42","CONTENT":[ "1234567890", "1234567890", "1234567890" ],"CREATE_DATE":"23/02/2016 14:13:35","CREATED_BY":"user1"}]}
+<pre>
+{
+    "COMMENT": [{
+        "REPORT_TYPE": [{
+            "REPORT_TYPE_CK": "21",
+            "REPORT_NAME": "Debit Transaction"
+        }],
+        "RECORD_CK": "285",
+        "COMMENT_CK": "23",
+        "CONTENT": "This is a test comment for Debit Transaction record.",
+        "CREATE_DATE": "22/02/2016 13:54:27",
+        "CREATED_BY": "user1"
+    }, {
+        "REPORT_TYPE": [{
+            "REPORT_TYPE_CK": "21",
+            "REPORT_NAME": "Debit Transaction"
+        }],
+        "RECORD_CK": "285",
+        "COMMENT_CK": "41",
+        "CONTENT": "Test Comment #2",
+        "CREATE_DATE": "23/02/2016 14:12:02",
+        "CREATED_BY": "user1"
+    }, {
+        "REPORT_TYPE": [{
+            "REPORT_TYPE_CK": "21",
+            "REPORT_NAME": "Debit Transaction"
+        }],
+        "RECORD_CK": "285",
+        "COMMENT_CK": "42",
+        "CONTENT": ["1234567890", "1234567890", "1234567890"],
+        "CREATE_DATE": "23/02/2016 14:13:35",
+        "CREATED_BY": "user1"
+    }]
+}
+</pre>
 
 The COMMENT table has a foreign key of REPORT_TYPE_CK from the REPORT_TYPE table. This table has two columns, REPORT_TYPE_CK and REPORT_NAME.
 
