@@ -9,6 +9,8 @@ BEGIN
 END;
 </pre>
 
+The results come back as a single line, but after passing it through the JSONLint validator you see this: 
+
 <pre>
 {
     "COMMENT": [{
