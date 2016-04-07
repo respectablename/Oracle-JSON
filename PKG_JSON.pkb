@@ -1,35 +1,37 @@
-CREATE OR REPLACE PACKAGE BODY PKG_JSON as
-    FUNCTION GET_JSON(p_first NUMBER DEFAULT 1, p_table VARCHAR2, p_where VARCHAR2 DEfAULT NULL) RETURN CLOB
+create or replace PACKAGE BODY        PKG_JSON as
+    FUNCTION GET_JSON(p_table VARCHAR2, p_where VARCHAR2 DEfAULT NULL) RETURN CLOB
+    IS result CLOB;
+    BEGIN
+        return GET_JSON_SUB(1, p_table, p_where);
+    END;
+    
+    FUNCTION GET_JSON_SUB(p_first NUMBER, p_table VARCHAR2, p_where VARCHAR2 DEfAULT NULL) RETURN CLOB
     IS result CLOB;
       v_v_val     VARCHAR2(4000);
       v_n_val     NUMBER;
       v_d_val     DATE;
       v_ret       NUMBER;
-      c           NUMBER;
-      d           NUMBER;
-      col_cnt     INTEGER;
-      f           BOOLEAN;
-      rec_tab     DBMS_SQL.DESC_TAB;
-      col_num     NUMBER;
+      v_col_cur   NUMBER;
+      v_col_d           NUMBER;
+      v_col_cnt     INTEGER;
+      v_rec_tab     DBMS_SQL.DESC_TAB;
       v_rowcount  NUMBER := 0;
       TYPE foreignkey IS TABLE of VARCHAR2(30) INDEX BY VARCHAR2(30);
       foreignkeys foreignkey;
       foreignColumn  VARCHAR2(30);
       foreignTable  VARCHAR2(30);
-      TYPE cur IS REF CURSOR;
-      v_cur   cur;    
     BEGIN
--- create a cursor
-      c := DBMS_SQL.OPEN_CURSOR;
+      -- create a cursor
+      v_col_cur := DBMS_SQL.OPEN_CURSOR;
       -- parse the SQL statement into the cursor
       v_v_val := 'SELECT * FROM ' || p_table;
       -- add optional where clause
       if (p_where IS NOT NULL) THEN
         v_v_val := v_v_val || ' ' || 'WHERE ' || p_where;
       end if;
-      DBMS_SQL.PARSE(c, v_v_val, DBMS_SQL.NATIVE);
+      DBMS_SQL.PARSE(v_col_cur, v_v_val, DBMS_SQL.NATIVE);
       -- execute the cursor
-      d := DBMS_SQL.EXECUTE(c);
+      v_col_d := DBMS_SQL.EXECUTE(v_col_cur);
       
       -- if this is the TOP result, we want to place the outer blocks
       if p_first = 1 THEN
@@ -37,36 +39,32 @@ CREATE OR REPLACE PACKAGE BODY PKG_JSON as
         result := result || '"' || p_table || '":[';
       END IF;
       -- Describe the columns returned by the SQL statement
-      DBMS_SQL.DESCRIBE_COLUMNS(c, col_cnt, rec_tab);
+      DBMS_SQL.DESCRIBE_COLUMNS(v_col_cur, v_col_cnt, v_rec_tab);
       --
       -- Bind local return variables to the various columns based on their types
-      FOR j in 1..col_cnt
+      FOR j in 1..v_col_cnt
       LOOP
-        CASE rec_tab(j).col_type
-          WHEN 1 THEN DBMS_SQL.DEFINE_COLUMN(c,j,v_v_val,2000); -- Varchar2
-          WHEN 2 THEN DBMS_SQL.DEFINE_COLUMN(c,j,v_n_val);      -- Number
-          WHEN 12 THEN DBMS_SQL.DEFINE_COLUMN(c,j,v_d_val);     -- Date
+        CASE v_rec_tab(j).col_type
+          WHEN 1 THEN DBMS_SQL.DEFINE_COLUMN(v_col_cur,j,v_v_val,2000); -- Varchar2
+          WHEN 2 THEN DBMS_SQL.DEFINE_COLUMN(v_col_cur,j,v_n_val);      -- Number
+          WHEN 12 THEN DBMS_SQL.DEFINE_COLUMN(v_col_cur,j,v_d_val);     -- Date
         ELSE
-          DBMS_SQL.DEFINE_COLUMN(c,j,v_v_val,2000);  -- Any other type return as varchar2
+          DBMS_SQL.DEFINE_COLUMN(v_col_cur,j,v_v_val,2000);  -- Any other type return as varchar2
         END CASE;
       END LOOP;
       --
      
      -- build a list of foreign key constraints for this table and store them in an array
-     OPEN v_cur FOR 'SELECT UCC.TABLE_NAME, UCC.COLUMN_NAME FROM USER_CONSTRAINTS  UC, USER_CONS_COLUMNS UCC WHERE UC.R_CONSTRAINT_NAME = UCC.CONSTRAINT_NAME AND uc.constraint_type = ''R'' AND UC.TABLE_NAME = ''' || p_table || '''';
+     FOR REC IN (SELECT UCC.TABLE_NAME, UCC.COLUMN_NAME FROM USER_CONSTRAINTS  UC, USER_CONS_COLUMNS UCC WHERE UC.R_CONSTRAINT_NAME = UCC.CONSTRAINT_NAME AND uc.constraint_type = 'R' AND UC.TABLE_NAME = p_table)
      LOOP
-       FETCH v_cur INTO foreignTable, foreignColumn;
-       EXIT WHEN v_cur%NOTFOUND;
-       foreignkeys(foreignColumn) := foreignTable;
+       foreignkeys(REC.COLUMN_NAME) := REC.TABLE_NAME;
      END LOOP;
-     
-     CLOSE v_cur;
       
       v_rowcount := 0;
 
       LOOP
         -- Fetch a row of data through the cursor
-        v_ret := DBMS_SQL.FETCH_ROWS(c);
+        v_ret := DBMS_SQL.FETCH_ROWS(v_col_cur);
         -- Exit when no more rows
         EXIT WHEN v_ret = 0;
         v_rowcount := v_rowcount + 1;
@@ -77,7 +75,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_JSON as
         result := result || '{';
         
         -- Fetch the value of each column from the row
-        FOR j in 1..col_cnt
+        FOR j in 1..v_col_cnt
         LOOP
         
           foreignTable := NULL;
@@ -85,7 +83,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_JSON as
           
           -- check the current column to see if it in the foreignkey array
           WHILE foreignColumn IS NOT NULL LOOP
-              if foreignColumn = rec_tab(j).col_name then 
+              if foreignColumn = v_rec_tab(j).col_name then 
                 foreignTable := foreignkeys(foreignColumn);
               end if;
               foreignColumn := foreignkeys.NEXT(foreignColumn);
@@ -95,29 +93,29 @@ CREATE OR REPLACE PACKAGE BODY PKG_JSON as
             -- perform the search for the foreign key table to get its values
           
             result := result || chr(11) || '"' || foreignTable || '":[';
-            DBMS_SQL.COLUMN_VALUE(c,j,v_n_val);
-            result := result || GET_JSON(0, foreignTable, rec_tab(j).col_name || ' = ' || v_n_val);
+            DBMS_SQL.COLUMN_VALUE(v_col_cur,j,v_n_val);
+            result := result || PKG_JSON.GET_JSON_SUB(0, foreignTable, v_rec_tab(j).col_name || ' = ' || v_n_val);
             result := result || chr(11) || ']';
           ELSE
               -- Fetch each column into the correct data type based on the description of the column
-              CASE rec_tab(j).col_type
-                WHEN 1  THEN DBMS_SQL.COLUMN_VALUE(c,j,v_v_val);
+              CASE v_rec_tab(j).col_type
+                WHEN 1  THEN DBMS_SQL.COLUMN_VALUE(v_col_cur,j,v_v_val);
                     if INSTR(v_v_val, chr(10)) > 0 OR INSTR(v_v_val, chr(13)) > 0 THEN
-                        result := result || chr(11) || '"' || rec_tab(j).col_name || '":' || TO_CHAR(BUILD_STRING_ARRAY(v_v_val)) || '';
+                        result := result || chr(11) || '"' || v_rec_tab(j).col_name || '":' || PKG_JSON.STRING_ARRAY(v_v_val) || '';
                     ELSE
-                        result := result || chr(11) || '"' || rec_tab(j).col_name || '":"' || v_v_val || '"';
+                        result := result || chr(11) || '"' || v_rec_tab(j).col_name || '":"' || v_v_val || '"';
                     END IF;
-                WHEN 2  THEN DBMS_SQL.COLUMN_VALUE(c,j,v_n_val);
-                             result := result || chr(11) || '"' || rec_tab(j).col_name || '":"' || v_n_val || '"';
-                WHEN 12 THEN DBMS_SQL.COLUMN_VALUE(c,j,v_d_val);
-                             result := result || chr(11) || '"' || rec_tab(j).col_name || '":"' || to_char(v_d_val,'DD/MM/YYYY HH24:MI:SS') || '"';
+                WHEN 2  THEN DBMS_SQL.COLUMN_VALUE(v_col_cur,j,v_n_val);
+                             result := result || chr(11) || '"' || v_rec_tab(j).col_name || '":"' || v_n_val || '"';
+                WHEN 12 THEN DBMS_SQL.COLUMN_VALUE(v_col_cur,j,v_d_val);
+                             result := result || chr(11) || '"' || v_rec_tab(j).col_name || '":"' || to_char(v_d_val,'DD/MM/YYYY HH24:MI:SS') || '"';
               ELSE
-                DBMS_SQL.COLUMN_VALUE(c,j,v_v_val);
-                result := result || chr(11) || '"' || rec_tab(j).col_name || '":"' || v_v_val || '"';
+                DBMS_SQL.COLUMN_VALUE(v_col_cur,j,v_v_val);
+                result := result || chr(11) || '"' || v_rec_tab(j).col_name || '":"' || v_v_val || '"';
               END CASE;
           END IF;
           
-          IF (j < col_cnt) THEN result := result || ',';
+          IF (j < v_col_cnt) THEN result := result || ',';
           END IF;
           
         END LOOP;
@@ -131,12 +129,12 @@ CREATE OR REPLACE PACKAGE BODY PKG_JSON as
       END IF;      
       
       -- Close the cursor now we have finished with it
-      DBMS_SQL.CLOSE_CURSOR(c);
+      DBMS_SQL.CLOSE_CURSOR(v_col_cur);
       
       return result;
     END;
 
-    FUNCTION BUILD_STRING_ARRAY(p_line VARCHAR2) RETURN CLOB
+    FUNCTION STRING_ARRAY(p_line VARCHAR2) RETURN CLOB
     IS result CLOB;
     BEGIN
         result := '["' || REPLACE(REPLACE(REPLACE(p_line, chr(13), chr(10)), chr(10) || chr(10), chr(10)), chr(10) , '", "' ) || '"]';           
